@@ -1,0 +1,55 @@
+name: lando-gatsby-drupal
+
+recipe: drupal9
+config:
+  via: nginx
+  webroot: drupal/web
+  php: '7.4'
+  database: mariadb
+
+proxy:
+  nodejs:
+    - gatsby.lgd.lndo.site:8000
+  appserver_nginx:
+    - drupal.lgd.lndo.site
+    - gatsbydrupal.lgd.lndo.site
+
+services:
+  appserver:
+    build:
+      - cd drupal && composer install
+    run:
+      - echo "Install Drupal with drush."
+      - drupal/scripts/install.sh
+  nodejs:
+    type: node
+    ssl: true
+    globals:
+      gatsby-cli: "2.12.62"
+      yarn: "1.22.4"
+    run:
+      - echo "Installing Gatsby with yarn."
+      - cd gatsby && yarn install
+  appserver_nginx:
+    ssl: true
+    sslExpose: true
+    type: nginx
+    build_as_root:
+      - cp /app/conf/nginx/drupal.lgd.lndo.site.conf /opt/bitnami/nginx/conf/vhosts/.
+      - cp /app/conf/nginx/gatsbydrupal.lgd.lndo.site.conf /opt/bitnami/nginx/conf/vhosts/.
+
+events:
+  post-start:
+    - nodejs: echo "Building the Gatsby site from Drupal."
+    - nodejs: cd gatsby && gatsby build
+    - nodejs: rm -rf gatsbydrupal/* && cp -R gatsby/public/* gatsbydrupal
+
+tooling:
+  npm:
+    service: nodejs
+  node:
+    service: nodejs
+  gatsby:
+    service: nodejs
+  yarn:
+    service: nodejs
